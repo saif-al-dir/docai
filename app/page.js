@@ -3,6 +3,8 @@
 import { useChat } from '@ai-sdk/react'
 import { useEffect, useRef, useState } from 'react'
 import DocumentsPanel from './documents-panel'
+import { createClient } from '@/lib/supabase/client'
+import { useRouter } from 'next/navigation'
 
 // Renders text, turning [1] [2] markers into clickable citation buttons
 function TextWithCitations({ text, onCite }) {
@@ -43,6 +45,19 @@ export default function ChatPage() {
   const [activeSource, setActiveSource] = useState(null)
   const bottomRef = useRef(null)
 
+  const [email, setEmail] = useState(null)
+  const router = useRouter()
+
+  useEffect(() => {
+    createClient().auth.getUser().then(({ data }) => setEmail(data?.user?.email ?? null))
+  }, [])
+
+  async function logout() {
+    await createClient().auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
+
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
@@ -81,9 +96,22 @@ export default function ChatPage() {
 
   return (
     <main className="mx-auto flex h-screen max-w-2xl flex-col px-4">
-      <header className="border-b border-zinc-800 py-4">
-        <h1 className="text-lg font-semibold">DocAI</h1>
-        <p className="text-sm text-zinc-500">Chat with your documents</p>
+      <header className="flex items-center justify-between border-b border-zinc-800 py-4">
+        <div>
+          <h1 className="text-lg font-semibold">DocAI</h1>
+          <p className="text-sm text-zinc-500">Chat with your documents</p>
+        </div>
+        {email && (
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <span className="text-zinc-500">{email}</span>
+            <button
+              onClick={logout}
+              className="rounded-lg border border-zinc-700 px-2 py-1 hover:border-zinc-500"
+            >
+              Log out
+            </button>
+          </div>
+        )}
       </header>
 
       <DocumentsPanel />

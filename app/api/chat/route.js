@@ -1,16 +1,21 @@
 import { streamText, embed, createUIMessageStream, createUIMessageStreamResponse } from 'ai'
 import { openai } from '@ai-sdk/openai'
 import { pool } from '@/lib/db'
+import { createClient } from '@/lib/supabase/server'
 
 const SYSTEM_BASE = `You are DocAI, an assistant that answers questions about the user's documents.
 
 Rules:
-- Ground your answer in the CONTEXT below.
-- Cite sources inline with [1], [2] ... matching the context block numbers.
-- If the CONTEXT doesn't contain the answer, say you couldn't find it in the documents — do not guess.
+- Ground answers about document content in the CONTEXT below; cite sources inline with [1], [2] ...
+- Questions about the conversation itself (e.g. "what did we discuss?") may be answered from the conversation history.
+- If neither the CONTEXT nor the conversation contains the answer, say you couldn't find it in the documents — do not guess.
 - Be concise.`
 
 export async function POST(req) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
   const { messages } = await req.json()
 
   const modelMessages = messages
@@ -23,13 +28,12 @@ export async function POST(req) {
     }))
     .filter((m) => m.content.length > 0)
 
-  // 1. Take the LATEST user question for retrieval
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   const question = lastUser
     ? lastUser.parts.filter((p) => p.type === 'text').map((p) => p.text).join('')
     : ''
 
-  // 2. Embed the question and retrieve the top 4 chunks
+  // Retrieval — scoped to THIS user's documents
   let sources = []
   if (question) {
     const { embedding } = await embed({
@@ -41,23 +45,22 @@ export async function POST(req) {
               1 - (c.embedding <=> $1::vector) as similarity
        from chunks c
        join documents d on d.id = c.document_id
+       where d.user_id = $2
        order by c.embedding <=> $1::vector
        limit 4`,
-      [JSON.stringify(embedding)]
+      [JSON.stringify(embedding), user.id]
     )
     sources = rows.map((r) => ({ ...r, similarity: Number(r.similarity) }))
   }
 
-  // 3. Inject the chunks into the system prompt
   const context = sources
     .map((s, i) => `[${i + 1}] ${s.title} (page ${s.page}):\n${s.content}`)
     .join('\n\n')
 
   const system = sources.length
     ? `${SYSTEM_BASE}\n\nCONTEXT:\n${context}`
-    : `${SYSTEM_BASE}\n\nNo documents are currently ingested. Say so.`
+    : `${SYSTEM_BASE}\n\nThe user has not uploaded any documents yet — say so.`
 
-  // 4. Stream: data-sources part first, then the grounded answer
   const result = streamText({
     model: openai('gpt-4o-mini'),
     system,

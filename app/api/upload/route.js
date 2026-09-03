@@ -1,12 +1,17 @@
 import { pool } from '@/lib/db'
+import { createClient } from '@/lib/supabase/server'
 import { extractPagesFromBuffer } from '@/lib/pdf-text'
 import { ingestDocument } from '@/lib/ingest'
 
 export const runtime = 'nodejs'
-const MAX_SIZE = 10 * 1024 * 1024 // 10 MB
+const MAX_SIZE = 10 * 1024 * 1024
 
 export async function POST(req) {
   try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
+
     const form = await req.formData()
     const file = form.get('file')
 
@@ -28,6 +33,7 @@ export async function POST(req) {
       title,
       filename: file.name,
       pages,
+      userId: user.id,
     })
 
     return Response.json({ ok: true, documentId, title, pages: pages.length, chunks: chunkCount })
