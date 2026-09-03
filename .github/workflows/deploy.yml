@@ -43,7 +43,7 @@ jobs:
           rsync -avz --delete --exclude='.env' \
             -e "ssh -i ~/.ssh/key" \
             .next/standalone/ \
-            "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}:domains/docai.saif1.usermd.net/"
+            "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}:domains/docai.saif1.usermd.net/public_nodejs/"
 
       - name: Restart app
         run: |
