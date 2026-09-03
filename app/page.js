@@ -2,6 +2,7 @@
 
 import { useChat } from '@ai-sdk/react'
 import { useEffect, useRef, useState } from 'react'
+import DocumentsPanel from './documents-panel'
 
 // Renders text, turning [1] [2] markers into clickable citation buttons
 function TextWithCitations({ text, onCite }) {
@@ -84,6 +85,8 @@ export default function ChatPage() {
         <h1 className="text-lg font-semibold">DocAI</h1>
         <p className="text-sm text-zinc-500">Chat with your documents</p>
       </header>
+
+      <DocumentsPanel />
 
       <div className="flex-1 space-y-4 overflow-y-auto py-6">
         {messages.length === 0 && (

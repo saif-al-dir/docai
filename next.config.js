@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  output: 'standalone',   // prepares the MyDevil deploy from day one
+  output: 'standalone',
+  serverExternalPackages: ['pg', 'pdf2json'],
 }
 export default nextConfig

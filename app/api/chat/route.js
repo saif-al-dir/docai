@@ -1,12 +1,6 @@
 import { streamText, embed, createUIMessageStream, createUIMessageStreamResponse } from 'ai'
 import { openai } from '@ai-sdk/openai'
-import pg from 'pg'
-
-// One pool for the whole app, reused across requests
-const pool = new pg.Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: { rejectUnauthorized: false },
-})
+import { pool } from '@/lib/db'
 
 const SYSTEM_BASE = `You are DocAI, an assistant that answers questions about the user's documents.
 
