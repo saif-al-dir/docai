@@ -1,0 +1,51 @@
+name: Deploy to MyDevil
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: npm run build
+
+      - name: Assemble deploy bundle
+        run: |
+          cp -r .next/static .next/standalone/.next/static
+          mkdir -p public
+          cp -r public .next/standalone/public
+          cp app.js .next/standalone/app.js
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.MYDEVIL_SSH_KEY }}" > ~/.ssh/key
+          chmod 600 ~/.ssh/key
+          ssh-keyscan -H ${{ secrets.MYDEVIL_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy files
+        run: |
+          rsync -avz --delete --exclude='.env' \
+            -e "ssh -i ~/.ssh/key" \
+            .next/standalone/ \
+            "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}:domains/docai.saif1.usermd.net/"
+
+      - name: Restart app
+        run: |
+          ssh -i ~/.ssh/key "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}" \
+            "devil www restart docai.saif1.usermd.net"
