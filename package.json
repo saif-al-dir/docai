@@ -1,0 +1,19 @@
+{
+  "name": "docai",
+  "version": "0.1.0",
+  "description": "Chat with your documents — RAG app with citations",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "ingest": "node scripts/ingest.cjs",
+    "query": "node scripts/query.js",
+    "db:debug": "node scripts/debug-db.js"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^17.4.2",
+    "openai": "^6.49.0",
+    "pdf2json": "^4.0.3",
+    "pg": "^8.23.0"
+  }
+}
