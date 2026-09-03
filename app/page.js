@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import DocumentsPanel from './documents-panel'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
+import UsageStats from './usage-stats'
 
 // Renders text, turning [1] [2] markers into clickable citation buttons
 function TextWithCitations({ text, onCite }) {
@@ -47,6 +48,13 @@ export default function ChatPage() {
 
   const [email, setEmail] = useState(null)
   const router = useRouter()
+  const [quota, setQuota] = useState(null)
+
+  useEffect(() => {
+    const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')
+    const part = lastAssistant?.parts.find((p) => p.type === 'data-quota')
+    if (part) setQuota(part.data)
+  }, [messages])
 
   useEffect(() => {
     createClient().auth.getUser().then(({ data }) => setEmail(data?.user?.email ?? null))
@@ -212,6 +220,11 @@ export default function ChatPage() {
           </div>
         </div>
       )}
+
+      <div className="flex items-center justify-between py-2 text-xs text-zinc-500">
+        {quota && <span>{quota.remaining} messages left · resets in {quota.resetInMin} min</span>}
+        <UsageStats refreshKey={messages.length} />
+      </div>
 
       <form onSubmit={onSubmit} className="flex gap-2 border-t border-zinc-800 py-4">
         <input

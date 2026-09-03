@@ -2,6 +2,7 @@ import { streamText, embed, createUIMessageStream, createUIMessageStreamResponse
 import { openai } from '@ai-sdk/openai'
 import { pool } from '@/lib/db'
 import { createClient } from '@/lib/supabase/server'
+import { checkRateLimit } from '@/lib/rate-limit'
 
 const SYSTEM_BASE = `You are DocAI, an assistant that answers questions about the user's documents.
 
@@ -16,6 +17,21 @@ export async function POST(req) {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return Response.json({ error: 'Unauthorized' }, { status: 401 })
 
+  // 0. Rate limit — before any expensive work (embedding, LLM, DB)
+  const rl = checkRateLimit(user.id)
+  if (!rl.allowed) {
+    const stream = createUIMessageStream({
+      execute: ({ writer }) => {
+        writer.write({
+          type: 'error',
+          errorText: `Rate limit reached — try again in ${rl.resetInMin} min.`,
+        })
+      },
+    })
+    return createUIMessageStreamResponse({ stream })
+  }
+
+  const startedAt = Date.now()
   const { messages } = await req.json()
 
   const modelMessages = messages
@@ -33,7 +49,6 @@ export async function POST(req) {
     ? lastUser.parts.filter((p) => p.type === 'text').map((p) => p.text).join('')
     : ''
 
-  // Retrieval — scoped to THIS user's documents
   let sources = []
   if (question) {
     const { embedding } = await embed({
@@ -65,6 +80,27 @@ export async function POST(req) {
     model: openai('gpt-4o-mini'),
     system,
     messages: modelMessages,
+    // Observability: log every completed exchange (never breaks the chat on failure)
+    onFinish: async ({ text, usage }) => {
+      try {
+        await pool.query(
+          `insert into chat_logs
+             (user_id, question, answer, sources_count, input_tokens, output_tokens, latency_ms)
+           values ($1, $2, $3, $4, $5, $6, $7)`,
+          [
+            user.id,
+            question,
+            text,
+            sources.length,
+            usage?.inputTokens ?? usage?.promptTokens ?? 0,
+            usage?.outputTokens ?? usage?.completionTokens ?? 0,
+            Date.now() - startedAt,
+          ]
+        )
+      } catch (err) {
+        console.error('[chat] usage log failed:', err.message)
+      }
+    },
   })
 
   const stream = createUIMessageStream({
@@ -77,6 +113,11 @@ export async function POST(req) {
           similarity: s.similarity,
           content: s.content,
         })),
+      })
+      // Quota channel — same data-part pattern as sources, now powering the UI meter
+      writer.write({
+        type: 'data-quota',
+        data: { remaining: rl.remaining, resetInMin: rl.resetInMin },
       })
       writer.merge(result.toUIMessageStream())
     },

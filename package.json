@@ -10,7 +10,8 @@
     "db:debug": "node scripts/debug-db.js",
     "dev": "next dev",
     "build": "next build",
-    "start": "next start"
+    "start": "next start",
+    "eval": "node scripts/eval.js"
   },
   "license": "MIT",
   "dependencies": {
