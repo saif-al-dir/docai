@@ -38,14 +38,18 @@ jobs:
           chmod 600 ~/.ssh/key
           ssh-keyscan -H ${{ secrets.MYDEVIL_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
 
-      - name: Deploy files
+      - name: Deploy Next bundle
         run: |
-          rsync -avz --delete --exclude='.env' \
+          rsync -avz --delete \
             -e "ssh -i ~/.ssh/key" \
             .next/standalone/ \
-            "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}:domains/docai.saif1.usermd.net/public_nodejs/"
+            "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}:domains/docai.saif1.usermd.net/public_nodejs/bundle/"
 
-      - name: Restart app
+      - name: Deploy entry files, clean old flat layout, restart
         run: |
+          ssh -i ~/.ssh/key "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}" \
+            "cd domains/docai.saif1.usermd.net/public_nodejs && rm -rf server.js package.json .next node_modules public && rm -f boot-error.log"
+          scp -i ~/.ssh/key app.js deploy/package.json \
+            "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}:domains/docai.saif1.usermd.net/public_nodejs/"
           ssh -i ~/.ssh/key "${{ secrets.MYDEVIL_USER }}@${{ secrets.MYDEVIL_HOST }}" \
             "devil www restart docai.saif1.usermd.net"
