@@ -127,5 +127,7 @@ export async function POST(req) {
     },
   })
 
-  return createUIMessageStreamResponse({ stream })
+  const response = createUIMessageStreamResponse({ stream })
+  response.headers.set('X-Accel-Buffering', 'no') // ask reverse proxies not to buffer the stream
+  return response
 }
