@@ -46,9 +46,6 @@ http.Server.prototype.listen = function (...args) {
   return origListen.apply(this, args)
 }
 
-// heartbeat — a SIGKILL can't be caught; the log just stops, and timestamps show when
-setInterval(() => __log('alive'), 15000).unref()
-
 import('./bundle/server.js')
   .then(() => __log('server.js import resolved'))
   .catch((err) => { __log('server import failed: ' + ((err && err.stack) || err)); origExit(1) })
