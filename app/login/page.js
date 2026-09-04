@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
+// Demo account — public by design. Cost abuse is bounded by the per-user
+// rate limiter (20 messages/hour). Recruiters get instant access without
+// reading the README first.
+const DEMO_EMAIL = 'demo@example.com'
+const DEMO_PASSWORD = 'Password123'
+
 export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -12,17 +18,11 @@ export default function LoginPage() {
   const [busy, setBusy] = useState(false)
   const router = useRouter()
 
-  async function onSubmit(e) {
-    e.preventDefault()
+  async function signIn(email, password) {
     setBusy(true)
     setError(null)
     const supabase = createClient()
-
-    const { error } =
-      mode === 'login'
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password })
-
+    const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
       setError(error.message)
       setBusy(false)
@@ -32,9 +32,36 @@ export default function LoginPage() {
     router.refresh()
   }
 
+  async function onSubmit(e) {
+    e.preventDefault()
+    if (mode === 'login') {
+      await signIn(email, password)
+      return
+    }
+    setBusy(true)
+    setError(null)
+    const supabase = createClient()
+    const { error } = await supabase.auth.signUp({ email, password })
+    if (error) {
+      setError(error.message)
+      setBusy(false)
+      return
+    }
+    router.push('/')
+    router.refresh()
+  }
+
+  async function tryDemo(e) {
+    e.preventDefault()
+    await signIn(DEMO_EMAIL, DEMO_PASSWORD)
+  }
+
   return (
     <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center px-4">
-      <h1 className="mb-6 text-center text-xl font-semibold">DocAI</h1>
+      <h1 className="mb-1 text-center text-xl font-semibold">DocAI</h1>
+      <p className="mb-6 text-center text-sm text-zinc-500">
+        Chat with your PDFs — streaming answers with citations.
+      </p>
 
       <form onSubmit={onSubmit} className="space-y-3 rounded-xl border border-zinc-800 p-4">
         <input
@@ -68,6 +95,22 @@ export default function LoginPage() {
         >
           {mode === 'login' ? 'No account? Sign up' : 'Have an account? Log in'}
         </button>
+
+        <div className="flex items-center gap-2 pt-1 text-xs text-zinc-600">
+          <span className="h-px flex-1 bg-zinc-800" />
+          or
+          <span className="h-px flex-1 bg-zinc-800" />
+        </div>
+
+        <button
+          type="button"
+          onClick={tryDemo}
+          disabled={busy}
+          className="w-full rounded-xl border border-zinc-700 px-4 py-2 text-sm text-zinc-300 hover:border-zinc-500 disabled:opacity-40"
+        >
+          Just looking? Explore the demo account
+        </button>
+
         {error && <p className="text-center text-xs text-red-400">{error}</p>}
       </form>
     </main>
